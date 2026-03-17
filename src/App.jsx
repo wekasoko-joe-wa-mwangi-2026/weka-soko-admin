@@ -111,7 +111,21 @@ function Modal({title,onClose,children,footer,large}){
 }
 
 function Login({onLogin}){
-  const [email,setEmail]=useState("");const [pw,setPw]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
+  const [mode,setMode]=useState("login"); // "login" | "forgot" | "reset"
+  const [email,setEmail]=useState("");const [pw,setPw]=useState("");
+  const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
+  const [msg,setMsg]=useState("");
+  const [newPw,setNewPw]=useState("");const [newPw2,setNewPw2]=useState("");
+
+  // Check for reset_token in URL
+  const [resetToken]=useState(()=>{
+    const p=new URLSearchParams(window.location.search);
+    const t=p.get("reset_token");
+    if(t)window.history.replaceState({},"",window.location.pathname);
+    return t||null;
+  });
+  if(resetToken&&mode==="login"){setMode("reset");}
+
   const submit=async()=>{
     if(!email||!pw){setErr("Enter email and password.");return;}
     setLoading(true);setErr("");
@@ -121,6 +135,58 @@ function Login({onLogin}){
       onLogin(d.user,d.token);
     }catch(e){setErr(e.message);}finally{setLoading(false);}
   };
+
+  const sendReset=async()=>{
+    if(!email.trim()){setErr("Enter your admin email.");return;}
+    setLoading(true);setErr("");
+    try{
+      await req("/api/auth/forgot-password",{method:"POST",body:JSON.stringify({email:email.trim(),admin:true})});
+      setMsg("If that admin email exists, a reset link has been sent. Check your inbox.");
+    }catch(e){setErr(e.message);}finally{setLoading(false);}
+  };
+
+  const doReset=async()=>{
+    if(!newPw||newPw.length<8){setErr("Password must be at least 8 characters.");return;}
+    if(newPw!==newPw2){setErr("Passwords do not match.");return;}
+    setLoading(true);setErr("");
+    try{
+      await req("/api/auth/reset-password",{method:"POST",body:JSON.stringify({token:resetToken,password:newPw})});
+      setMsg("Password updated. You can now sign in.");
+      setMode("login");
+    }catch(e){setErr(e.message);}finally{setLoading(false);}
+  };
+
+  if(mode==="reset")return <div className="login-wrap">
+    <div className="login-box">
+      <div style={{fontSize:24,fontWeight:800,marginBottom:4,letterSpacing:"-.02em"}}>Weka<span style={{color:"var(--accent)"}}>Soko</span></div>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:"var(--mut)",marginBottom:24}}>Set New Password</div>
+      {err&&<div style={{background:"rgba(192,48,48,.06)",borderLeft:"3px solid var(--red)",padding:"10px 14px",fontSize:12,color:"var(--red)",marginBottom:16}}>{err}</div>}
+      {msg&&<div style={{background:"rgba(20,40,160,.06)",borderLeft:"3px solid var(--accent)",padding:"10px 14px",fontSize:12,color:"var(--accent)",marginBottom:16}}>{msg}</div>}
+      <FF label="New Password"><input className="inp" type="password" placeholder="Min 8 characters" value={newPw} onChange={e=>setNewPw(e.target.value)}/></FF>
+      <FF label="Confirm Password"><input className="inp" type="password" placeholder="Repeat password" value={newPw2} onChange={e=>setNewPw2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doReset()}/></FF>
+      <button className="btn bp" style={{width:"100%",marginTop:8}} onClick={doReset} disabled={loading}>{loading?<Spin/>:"Set New Password →"}</button>
+      <button className="btn bgh" style={{width:"100%",marginTop:8,fontSize:12}} onClick={()=>setMode("login")}>← Back to Sign In</button>
+    </div>
+  </div>;
+
+  if(mode==="forgot")return <div className="login-wrap">
+    <div className="login-box">
+      <div style={{fontSize:24,fontWeight:800,marginBottom:4,letterSpacing:"-.02em"}}>Weka<span style={{color:"var(--accent)"}}>Soko</span></div>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:"var(--mut)",marginBottom:24}}>Reset Password</div>
+      {err&&<div style={{background:"rgba(192,48,48,.06)",borderLeft:"3px solid var(--red)",padding:"10px 14px",fontSize:12,color:"var(--red)",marginBottom:16}}>{err}</div>}
+      {msg
+        ?<><div style={{background:"rgba(20,40,160,.06)",borderLeft:"3px solid var(--accent)",padding:"12px 14px",fontSize:13,color:"var(--accent)",marginBottom:20,lineHeight:1.6}}>{msg}</div>
+          <button className="btn bgh" style={{width:"100%",fontSize:12}} onClick={()=>{setMode("login");setMsg("");}}>← Back to Sign In</button></>
+        :<>
+          <p style={{fontSize:13,color:"var(--mut)",marginBottom:20,lineHeight:1.6}}>Enter your admin email address and we'll send you a link to reset your password.</p>
+          <FF label="Admin Email"><input className="inp" type="email" placeholder="admin@wekasoko.co.ke" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendReset()}/></FF>
+          <button className="btn bp" style={{width:"100%",marginTop:8}} onClick={sendReset} disabled={loading}>{loading?<Spin/>:"Send Reset Link →"}</button>
+          <button className="btn bgh" style={{width:"100%",marginTop:8,fontSize:12}} onClick={()=>setMode("login")}>← Back to Sign In</button>
+        </>
+      }
+    </div>
+  </div>;
+
   return <div className="login-wrap">
     <div className="login-box">
       <div style={{fontSize:24,fontWeight:800,marginBottom:4,letterSpacing:"-.02em"}}>Weka<span style={{color:"var(--accent)"}}>Soko</span></div>
@@ -129,6 +195,7 @@ function Login({onLogin}){
       <FF label="Email"><input className="inp" type="email" placeholder="admin@wekasoko.co.ke" value={email} onChange={e=>setEmail(e.target.value)}/></FF>
       <FF label="Password"><input className="inp" type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/></FF>
       <button className="btn bp" style={{width:"100%",marginTop:8}} onClick={submit} disabled={loading}>{loading?<Spin/>:"Sign In →"}</button>
+      <button className="btn bgh" style={{width:"100%",marginTop:8,fontSize:12,color:"var(--mut)"}} onClick={()=>{setMode("forgot");setErr("");}}>Forgot password?</button>
     </div>
   </div>;
 }
