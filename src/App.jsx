@@ -147,14 +147,42 @@ function Overview({token}){
   useEffect(()=>{req("/api/admin/stats",{},token).then(setS).catch(()=>{}).finally(()=>setLoading(false));},[token]);
   if(loading)return <div style={{textAlign:"center",padding:60}}><Spin/></div>;
   if(!s)return <div className="empty">Could not load stats.</div>;
-  const {listings:L,users:U,payments:P,violations:V,escrows:E,disputes:D}=s;
+  const {listings:L,users:U,payments:P,violations:V,escrows:E,disputes:D,soldChannels:SC,requests:R}=s;
   return <>
     <div className="stat-grid">
-      {[{l:"Total Users",v:U?.total||0,c:"#1D1D1D"},{l:"Sellers",v:U?.sellers||0,c:"#1428A0"},{l:"Buyers",v:U?.buyers||0,c:"#1428A0"},{l:"Active Listings",v:L?.active||0,c:"#1428A0"},{l:"Sold Items",v:L?.sold||0,c:"#8B6400"},{l:"Unlock Revenue",v:fmtKES(P?.unlock_revenue),c:"#1428A0",sm:true},{l:"Escrow Volume",v:fmtKES(P?.escrow_volume),c:"#1428A0",sm:true},{l:"Active Escrows",v:E?.active||0,c:"#1428A0"},{l:"Open Disputes",v:D?.open||0,c:"#C03030"},{l:"Violations",v:V?.total||0,c:"#8B6400"},{l:"Suspended",v:U?.suspended||0,c:"#C03030"}].map(x=>(
+      {[
+        {l:"Total Users",v:U?.total||0,c:"#1D1D1D"},
+        {l:"Sellers",v:U?.sellers||0,c:"#1428A0"},
+        {l:"Buyers",v:U?.buyers||0,c:"#1428A0"},
+        {l:"Active Listings",v:L?.active||0,c:"#1428A0"},
+        {l:"Sold Items",v:L?.sold||0,c:"#8B6400"},
+        {l:"Buyer Requests",v:R?.active||0,c:"#1428A0"},
+        {l:"Unlock Revenue",v:fmtKES(P?.unlock_revenue),c:"#1428A0",sm:true},
+        {l:"Escrow Volume",v:fmtKES(P?.escrow_volume),c:"#1428A0",sm:true},
+        {l:"Active Escrows",v:E?.active||0,c:"#1428A0"},
+        {l:"Open Disputes",v:D?.open||0,c:"#C03030"},
+        {l:"Violations",v:V?.total||0,c:"#8B6400"},
+        {l:"Suspended",v:U?.suspended||0,c:"#C03030"},
+      ].map(x=>(
         <div key={x.l} className="stat-card"><div className="stat-val" style={{color:x.c,fontSize:x.sm?15:26}}>{x.v}</div><div className="stat-lbl">{x.l}</div></div>
       ))}
     </div>
-    <div style={{background:"rgba(20,40,160,.04)",border:"1px solid rgba(20,40,160,.2)",borderRadius:0,padding:"10px 14px",fontSize:12,color:"#1428A0"}}>✓ Live data from Railway database. Refresh to update.</div>
+    {SC&&parseInt(SC.total_sold)>0&&<div style={{background:"#fff",border:"1px solid #E6E6E6",padding:"16px 20px",marginTop:16}}>
+      <div style={{fontWeight:700,fontSize:13,marginBottom:12,letterSpacing:"-.01em"}}>🏷️ Sale Channel Breakdown</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        {[
+          {l:"Via Weka Soko",v:SC.sold_on_platform||0,icon:"🛒",c:"#1428A0"},
+          {l:"Outside Platform",v:SC.sold_outside||0,icon:"🤝",c:"#8B6400"},
+          {l:"Unknown",v:SC.sold_channel_unknown||0,icon:"❓",c:"#636363"},
+        ].map(x=><div key={x.l} style={{background:"#F6F6F6",padding:"12px 14px"}}>
+          <div style={{fontSize:18,marginBottom:4}}>{x.icon}</div>
+          <div style={{fontSize:20,fontWeight:700,color:x.c}}>{x.v}</div>
+          <div style={{fontSize:10,color:"#636363",marginTop:2,textTransform:"uppercase",letterSpacing:".06em"}}>{x.l}</div>
+          <div style={{fontSize:10,color:"#AEAEB2",marginTop:1}}>{parseInt(SC.total_sold)>0?Math.round((x.v/parseInt(SC.total_sold))*100):0}% of sold</div>
+        </div>)}
+      </div>
+    </div>}
+    <div style={{background:"rgba(20,40,160,.04)",border:"1px solid rgba(20,40,160,.2)",padding:"10px 14px",fontSize:12,color:"#1428A0",marginTop:12}}>✓ Live data from Railway database. Refresh to update.</div>
   </>;
 }
 
@@ -606,6 +634,134 @@ function Escrow({token,notify}){
   </>;
 }
 
+// ── SOLD LISTINGS ─────────────────────────────────────────────────────────────
+function SoldListings({token}){
+  const [items,setItems]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [pg,setPg]=useState(1);
+  const [total,setTotal]=useState(0);
+  const PER=30;
+
+  useEffect(()=>{
+    setLoading(true);
+    req(`/api/admin/sold?page=${pg}&limit=${PER}`,{},token)
+      .then(d=>{setItems(d.listings||[]);setTotal(d.total||0);})
+      .catch(()=>{}).finally(()=>setLoading(false));
+  },[pg,token]);
+
+  const fmtDate=ts=>ts?new Date(ts).toLocaleDateString("en-KE",{day:"numeric",month:"short",year:"numeric"}):"—";
+  const duration=(created,sold)=>{
+    if(!created||!sold)return"—";
+    const days=Math.round((new Date(sold)-new Date(created))/86400000);
+    if(days===0)return"Same day";
+    if(days===1)return"1 day";
+    if(days<7)return`${days} days`;
+    if(days<30)return`${Math.floor(days/7)}w`;
+    return`${Math.floor(days/30)}mo`;
+  };
+
+  return <>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+      <div style={{fontSize:13,color:"#636363",fontWeight:600}}>{total} sold listing{total!==1?"s":""}</div>
+    </div>
+    <div className="tw">
+      {loading?<div style={{textAlign:"center",padding:40}}><Spin/></div>:
+      items.length===0?<div className="empty">No sold listings yet</div>:
+      <div className="ts"><table>
+        <thead><tr>
+          <th>Item</th><th>Price</th><th>Category</th>
+          <th>Listed</th><th>Sold</th><th>Time to Sell</th>
+          <th>Channel</th><th>Seller</th>
+        </tr></thead>
+        <tbody>{items.map(l=>{
+          const photo=Array.isArray(l.photos)?l.photos[0]:null;
+          return <tr key={l.id}>
+            <td>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:40,height:32,background:"#F4F4F4",overflow:"hidden",flexShrink:0}}>
+                  {photo&&<img src={typeof photo==="string"?photo:photo?.url||photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
+                </div>
+                <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>{l.title}</div>
+              </div>
+            </td>
+            <td style={{fontWeight:700,color:"#1428A0"}}>{fmtKES(l.price)}</td>
+            <td><span className="badge bm" style={{fontSize:10}}>{l.category}</span></td>
+            <td style={{fontSize:12,color:"#636363",whiteSpace:"nowrap"}}>{fmtDate(l.created_at)}</td>
+            <td style={{fontSize:12,color:"#1428A0",fontWeight:600,whiteSpace:"nowrap"}}>{fmtDate(l.sold_at)}</td>
+            <td style={{fontSize:12,fontWeight:700}}>{duration(l.created_at,l.sold_at)}</td>
+            <td>{l.sold_channel
+              ?<span className={`badge ${l.sold_channel==="platform"?"bg":"by2"}`} style={{fontSize:10}}>
+                {l.sold_channel==="platform"?"🛒 WekaSoko":"🤝 Elsewhere"}
+              </span>
+              :<span style={{fontSize:11,color:"#AEAEB2"}}>—</span>}
+            </td>
+            <td style={{fontSize:12,color:"#636363"}}>{l.seller_name||"—"}</td>
+          </tr>;
+        })}</tbody>
+      </table></div>}
+    </div>
+    {Math.ceil(total/PER)>1&&<div style={{display:"flex",gap:8,justifyContent:"center",marginTop:16}}>
+      {pg>1&&<button className="btn bs sm" onClick={()=>setPg(p=>p-1)}>← Prev</button>}
+      <span style={{padding:"6px 12px",fontSize:12,color:"#636363"}}>Page {pg} of {Math.ceil(total/PER)}</span>
+      {pg<Math.ceil(total/PER)&&<button className="btn bs sm" onClick={()=>setPg(p=>p+1)}>Next →</button>}
+    </div>}
+  </>;
+}
+
+// ── BUYER REQUESTS ────────────────────────────────────────────────────────────
+function BuyerRequests({token}){
+  const [items,setItems]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [total,setTotal]=useState(0);
+  const [filter,setFilter]=useState("active");
+
+  useEffect(()=>{
+    setLoading(true);
+    req(`/api/admin/requests?limit=50&status=${filter}`,{},token)
+      .then(d=>{setItems(d.requests||[]);setTotal(d.total||0);})
+      .catch(()=>{}).finally(()=>setLoading(false));
+  },[filter,token]);
+
+  const fmtDate=ts=>ts?new Date(ts).toLocaleDateString("en-KE",{day:"numeric",month:"short",year:"numeric"}):"—";
+
+  return <>
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+      <div style={{fontSize:13,color:"#636363",fontWeight:600,flex:1}}>{total} buyer request{total!==1?"s":""}</div>
+      <div style={{display:"flex",gap:4}}>
+        {["active","all"].map(f=><button key={f} className={`btn sm ${filter===f?"bp":"bs"}`}
+          onClick={()=>setFilter(f)} style={{fontSize:11,padding:"5px 12px",textTransform:"capitalize"}}>{f}</button>)}
+      </div>
+    </div>
+    <div className="tw">
+      {loading?<div style={{textAlign:"center",padding:40}}><Spin/></div>:
+      items.length===0?<div className="empty">No buyer requests found</div>:
+      <div className="ts"><table>
+        <thead><tr>
+          <th>Request</th><th>Budget</th><th>County</th>
+          <th>Pitches</th><th>Status</th><th>Posted</th>
+        </tr></thead>
+        <tbody>{items.map(r=><tr key={r.id}>
+          <td>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:3}}>{r.title}</div>
+            <div style={{fontSize:11,color:"#636363",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:280}}>
+              {r.description?.slice(0,80)}{r.description?.length>80?"...":""}
+            </div>
+          </td>
+          <td style={{fontWeight:700,color:"#1428A0"}}>{r.budget?fmtKES(r.budget):"—"}</td>
+          <td style={{fontSize:12,color:"#636363"}}>{r.county||"Any"}</td>
+          <td style={{textAlign:"center"}}>
+            <span className={`badge ${parseInt(r.pitch_count)>0?"bg":"bm"}`} style={{fontSize:11}}>
+              {r.pitch_count||0}
+            </span>
+          </td>
+          <td><span className={`badge ${r.status==="active"?"bg2":"bm"}`} style={{fontSize:10}}>{r.status}</span></td>
+          <td style={{fontSize:12,color:"#636363",whiteSpace:"nowrap"}}>{fmtDate(r.created_at)}</td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>
+  </>;
+}
+
 function Payments({token}){
   const [payments,setPayments]=useState([]);const [loading,setLoading]=useState(true);const [q,setQ]=useState("");
   useEffect(()=>{req("/api/admin/payments",{},token).then(setPayments).catch(()=>{}).finally(()=>setLoading(false));},[token]);
@@ -791,6 +947,8 @@ const SECTIONS=[
   {id:"review",icon:"🔍",label:"Review Queue"},
   {id:"users",icon:"👥",label:"Users"},
   {id:"listings",icon:"📦",label:"Listings"},
+  {id:"sold",icon:"✅",label:"Sold Listings"},
+  {id:"requests",icon:"🛒",label:"Buyer Requests"},
   {id:"reports",icon:"🚩",label:"Reports"},
   {id:"violations",icon:"🚨",label:"Violations"},
   {id:"escrow",icon:"🔐",label:"Escrow & Disputes"},
@@ -837,6 +995,8 @@ export default function AdminApp(){
       {section==="review"&&<ReviewQueue token={token} notify={notify}/>}
       {section==="users"&&<Users token={token} notify={notify}/>}
       {section==="listings"&&<Listings token={token} notify={notify}/>}
+      {section==="sold"&&<SoldListings token={token}/>}
+      {section==="requests"&&<BuyerRequests token={token}/>}
       {section==="reports"&&<Reports token={token} notify={notify}/>}
       {section==="violations"&&<Violations token={token} notify={notify}/>}
       {section==="escrow"&&<Escrow token={token} notify={notify}/>}
