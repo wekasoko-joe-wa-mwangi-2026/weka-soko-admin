@@ -515,7 +515,11 @@ function Users({token,notify}){
 
 function Listings({token,notify}){
   const [listings,setListings]=useState([]);const [loading,setLoading]=useState(true);const [q,setQ]=useState("");const [sf,setSf]=useState("");
-  const [viewListing,setViewListing]=useState(null); // listing to show in detail modal
+  const [viewListing,setViewListing]=useState(null);
+  const [markSoldListing,setMarkSoldListing]=useState(null); // listing to mark sold
+  const [soldChannel,setSoldChannel]=useState("platform");
+  const [markingSold,setMarkingSold]=useState(false);
+
   const load=useCallback(()=>{
     setLoading(true);
     const p=new URLSearchParams();if(sf)p.set("status",sf);if(q)p.set("search",q);
@@ -526,6 +530,19 @@ function Listings({token,notify}){
   const updStatus=async(id,status)=>{try{await req(`/api/admin/listings/${id}`,{method:"PATCH",body:JSON.stringify({status})},token);setListings(p=>p.map(l=>l.id===id?{...l,status}:l));notify(`Status set to "${status}".`,true);}catch(e){notify(e.message,false);}};
   const del=async id=>{if(!window.confirm("Permanently delete this listing?"))return;try{await req(`/api/admin/listings/${id}`,{method:"DELETE"},token);setListings(p=>p.filter(l=>l.id!==id));notify("Deleted.",true);}catch(e){notify(e.message,false);}};
   const restoreListing=async id=>{try{await req(`/api/admin/listings/${id}/restore`,{method:"POST"},token);setListings(p=>p.map(l=>l.id===id?{...l,status:"active"}:l));notify("Listing restored to active.",true);}catch(e){notify(e.message,false);}};
+
+  const confirmMarkSold=async()=>{
+    if(!markSoldListing)return;
+    setMarkingSold(true);
+    try{
+      await req(`/api/admin/listings/${markSoldListing.id}/mark-sold`,{method:"POST",body:JSON.stringify({sold_channel:soldChannel})},token);
+      setListings(p=>p.map(l=>l.id===markSoldListing.id?{...l,status:"sold"}:l));
+      notify(`✅ "${markSoldListing.title}" marked as sold (${soldChannel}).`,true);
+      setMarkSoldListing(null);
+    }catch(e){notify(e.message,false);}
+    finally{setMarkingSold(false);}
+  };
+
   const sc=s=>({active:"bg",sold:"by2",locked:"bb2",deleted:"br2",archived:"by2",flagged:"br2"}[s]||"bm");
 
   return <>
@@ -539,23 +556,62 @@ function Listings({token,notify}){
         <thead><tr><th>Title</th><th>Seller</th><th>Price</th><th>Category</th><th>Status</th><th>Flags</th><th>Posted</th><th>Actions</th></tr></thead>
         <tbody>{listings.length===0?<tr><td colSpan={8}><div className="empty">No listings found</div></td></tr>:listings.map(l=><tr key={l.id}>
           <td style={{fontWeight:600,maxWidth:160}}>
-            <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",color:"var(--accent)"}} onClick={()=>setViewListing(l)} title="Click to view details">{l.title}</div>
+            <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",color:"#1428A0"}} onClick={()=>setViewListing(l)} title="Click to view details">{l.title}</div>
           </td>
-          <td style={{fontSize:12,color:"var(--mut)"}}>{l.seller_name}</td>
-          <td style={{color:"var(--accent)",fontWeight:700}}>{fmtKES(l.price)}</td>
-          <td style={{fontSize:12,color:"var(--mut)"}}>{l.category}</td>
+          <td style={{fontSize:12,color:"#636363"}}>{l.seller_name}</td>
+          <td style={{color:"#1428A0",fontWeight:700}}>{fmtKES(l.price)}</td>
+          <td style={{fontSize:12,color:"#636363"}}>{l.category}</td>
           <td><span className={`badge ${sc(l.status)}`}>{l.status}</span></td>
           <td>{parseInt(l.pending_reports||0)>0&&<span className="badge br2">🚩 {l.pending_reports}</span>}</td>
-          <td style={{fontSize:11,color:"var(--mut)"}}>{ago(l.created_at)}</td>
+          <td style={{fontSize:11,color:"#636363"}}>{ago(l.created_at)}</td>
           <td><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
             <button className="btn bs sm" onClick={()=>setViewListing(l)}>👁 View</button>
             {l.status!=="active"&&<button className="btn bp sm" onClick={()=>updStatus(l.id,"active")}>Activate</button>}
             {(l.status==="archived"||l.status==="flagged")&&<button className="btn bp sm" onClick={()=>restoreListing(l.id)}>↩ Restore</button>}
+            {(l.status==="active"||l.status==="locked")&&<button className="btn by sm" onClick={()=>{setSoldChannel("platform");setMarkSoldListing(l);}}>✅ Mark Sold</button>}
             <button className="btn br sm" onClick={()=>del(l.id)}>Delete</button>
           </div></td>
         </tr>)}</tbody>
       </table></div>}
     </div>
+
+    {/* Mark as Sold modal */}
+    {markSoldListing&&<Modal title="Mark Listing as Sold" onClose={()=>setMarkSoldListing(null)}>
+      <div style={{marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{markSoldListing.title}</div>
+        <div style={{fontSize:13,color:"#636363"}}>{fmtKES(markSoldListing.price)} · {markSoldListing.category} · {markSoldListing.seller_name}</div>
+      </div>
+      <div style={{marginBottom:20}}>
+        <div className="lbl" style={{marginBottom:8}}>Where was this item sold? <span style={{color:"#C03030"}}>*</span></div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {[
+            {val:"platform",icon:"🛒",label:"Sold via Weka Soko",desc:"The buyer and seller connected and transacted through the platform"},
+            {val:"outside",icon:"🤝",label:"Sold outside the platform",desc:"The seller sold the item independently, not through Weka Soko"},
+          ].map(opt=>(
+            <div key={opt.val} onClick={()=>setSoldChannel(opt.val)}
+              style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",border:`2px solid ${soldChannel===opt.val?"#1428A0":"#E6E6E6"}`,cursor:"pointer",background:soldChannel===opt.val?"rgba(20,40,160,.04)":"#fff",transition:"all .15s"}}>
+              <div style={{fontSize:24,marginTop:2}}>{opt.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:13,color:soldChannel===opt.val?"#1428A0":"#1D1D1D"}}>{opt.label}</div>
+                <div style={{fontSize:12,color:"#636363",marginTop:3}}>{opt.desc}</div>
+              </div>
+              <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${soldChannel===opt.val?"#1428A0":"#ADADAD"}`,background:soldChannel===opt.val?"#1428A0":"transparent",flexShrink:0,marginTop:3,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {soldChannel===opt.val&&<div style={{width:8,height:8,borderRadius:"50%",background:"#fff"}}/>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{background:"rgba(192,48,48,.04)",border:"1px solid rgba(192,48,48,.15)",padding:"10px 13px",fontSize:12,color:"#7f1d1d",marginBottom:16}}>
+        ⚠️ This action cannot be undone. The listing status will be permanently changed to <strong>Sold</strong> and the seller will be notified.
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <button className="btn bs" onClick={()=>setMarkSoldListing(null)}>Cancel</button>
+        <button className="btn bp" onClick={confirmMarkSold} disabled={markingSold}>
+          {markingSold?<Spin/>:"✅ Confirm — Mark as Sold"}
+        </button>
+      </div>
+    </Modal>}
 
     {viewListing&&<ListingDetailModal
       listing={viewListing}
