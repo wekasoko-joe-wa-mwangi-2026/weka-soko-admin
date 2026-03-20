@@ -774,7 +774,7 @@ function SoldListings({token,notify}){
             <td>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:40,height:32,background:"#F4F4F4",overflow:"hidden",flexShrink:0}}>
-                  {photo&&<img src={typeof photo==="string"?photo:photo?.url||photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  {photo&&<img src={typeof photo==="string"?photo:photo?.url||photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
                 </div>
                 <div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:160}}>{l.title}</div>
               </div>
