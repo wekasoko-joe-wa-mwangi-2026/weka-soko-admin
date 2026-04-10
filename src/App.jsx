@@ -534,6 +534,9 @@ function Listings({token,notify}){
   const [markSoldListing,setMarkSoldListing]=useState(null); // listing to mark sold
   const [soldChannel,setSoldChannel]=useState("platform");
   const [markingSold,setMarkingSold]=useState(false);
+  const [discountListing,setDiscountListing]=useState(null);
+  const [discountAmount,setDiscountAmount]=useState("");
+  const [applyingDiscount,setApplyingDiscount]=useState(false);
 
   const load=useCallback(()=>{
     setLoading(true);
@@ -545,6 +548,19 @@ function Listings({token,notify}){
   const updStatus=async(id,status)=>{try{await req(`/api/admin/listings/${id}`,{method:"PATCH",body:JSON.stringify({status})},token);setListings(p=>p.map(l=>l.id===id?{...l,status}:l));notify(`Status set to "${status}".`,true);}catch(e){notify(e.message,false);}};
   const del=async id=>{if(!window.confirm("Permanently delete this listing?"))return;try{await req(`/api/admin/listings/${id}`,{method:"DELETE"},token);setListings(p=>p.filter(l=>l.id!==id));notify("Deleted.",true);}catch(e){notify(e.message,false);}};
   const restoreListing=async id=>{try{await req(`/api/admin/listings/${id}/restore`,{method:"POST"},token);setListings(p=>p.map(l=>l.id===id?{...l,status:"active"}:l));notify("Listing restored to active.",true);}catch(e){notify(e.message,false);}};
+
+  const applyDiscount=async()=>{
+    const amt=parseInt(discountAmount);
+    if(isNaN(amt)||amt<0||amt>250){notify("Enter an amount between 0 and 250.",false);return;}
+    setApplyingDiscount(true);
+    try{
+      await req(`/api/admin/listings/${discountListing.id}/discount`,{method:"POST",body:JSON.stringify({discount_amount:amt})},token);
+      setListings(p=>p.map(l=>l.id===discountListing.id?{...l,unlock_discount:amt}:l));
+      notify(amt>=250?"Free unlock granted — seller notified.":`KSh ${amt} discount applied — seller notified.`,true);
+      setDiscountListing(null);setDiscountAmount("");
+    }catch(e){notify(e.message,false);}
+    setApplyingDiscount(false);
+  };
 
   const confirmMarkSold=async()=>{
     if(!markSoldListing)return;
@@ -583,7 +599,8 @@ function Listings({token,notify}){
             <button className="btn bs sm" onClick={()=>setViewListing(l)}>👁 View</button>
             {l.status!=="active"&&<button className="btn bp sm" onClick={()=>updStatus(l.id,"active")}>Activate</button>}
             {(l.status==="archived"||l.status==="flagged")&&<button className="btn bp sm" onClick={()=>restoreListing(l.id)}>↩ Restore</button>}
-            {(l.status==="active"||l.status==="locked")&&<button className="btn by sm" onClick={()=>{setSoldChannel("platform");setMarkSoldListing(l);}}>✅ Mark Sold</button>}
+            {(l.status==="active"||l.status==="locked")&&<button className="btn by sm" onClick={()=>{setSoldChannel("platform");setMarkSoldListing(l);}}>Mark Sold</button>}
+            {(l.status==="active"||l.status==="locked")&&<button className="btn bb sm" onClick={()=>{setDiscountListing(l);setDiscountAmount(l.unlock_discount>0?String(l.unlock_discount):"");}} title="Grant unlock discount or free unlock">{l.unlock_discount>0?`Discount: -${l.unlock_discount}`:"Discount"}</button>}
             <button className="btn br sm" onClick={()=>del(l.id)}>Delete</button>
           </div></td>
         </tr>)}</tbody>
@@ -635,6 +652,38 @@ function Listings({token,notify}){
       onClose={()=>setViewListing(null)}
       onUpdated={updated=>{setListings(p=>p.map(l=>l.id===updated.id?updated:l));setViewListing(updated);}}
     />}
+
+    {discountListing&&<div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget){setDiscountListing(null);setDiscountAmount("");}}}>
+      <div className="modal" style={{maxWidth:440}}>
+        <div className="mh"><span style={{fontWeight:700}}>Grant Unlock Discount</span><button className="bgh" onClick={()=>{setDiscountListing(null);setDiscountAmount("");}} style={{fontSize:20,background:"none",border:"none",cursor:"pointer",color:"#636363"}}>×</button></div>
+        <div className="mb">
+          <div style={{fontWeight:700,marginBottom:4}}>{discountListing.title}</div>
+          <div style={{fontSize:12,color:"var(--mut)",marginBottom:20}}>Seller: {discountListing.seller_name} · Current unlock fee: KSh {Math.max(0,250-(discountListing.unlock_discount||0))}</div>
+          <label className="lbl">Discount Amount (KSh)</label>
+          <input className="inp" type="number" min={0} max={250} value={discountAmount} onChange={e=>setDiscountAmount(e.target.value)} placeholder="e.g. 100" style={{marginBottom:8}}/>
+          <div style={{fontSize:12,color:"var(--mut)",marginBottom:16}}>
+            {discountAmount>=250||discountAmount==="250"
+              ?<span style={{color:"#15803d",fontWeight:700}}>FREE unlock — seller pays KSh 0</span>
+              :discountAmount>0
+              ?<span>Seller will pay <strong>KSh {Math.max(0,250-parseInt(discountAmount||0))}</strong> (was KSh 250)</span>
+              :"Enter 0–250. Enter 250 for a fully free unlock."
+            }
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+            {[50,100,150,200,250].map(v=><button key={v} className="btn bb sm" onClick={()=>setDiscountAmount(String(v))}>{v===250?"FREE":"-"+v}</button>)}
+          </div>
+          <div style={{background:"rgba(20,40,160,.04)",border:"1px solid rgba(20,40,160,.2)",padding:"10px 13px",fontSize:12,color:"#1428A0",marginBottom:16}}>
+            The seller will receive an in-app notification and email with the new price.
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            <button className="btn bs" onClick={()=>{setDiscountListing(null);setDiscountAmount("");}}>Cancel</button>
+            <button className="btn bp" onClick={applyDiscount} disabled={applyingDiscount||discountAmount===""}>
+              {applyingDiscount?<span className="spin"/>:null} Apply Discount
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>}
   </>;
 }
 
