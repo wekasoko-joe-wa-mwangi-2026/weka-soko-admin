@@ -490,8 +490,190 @@ function ReviewQueue({token,notify}){
   </>;
 }
 
+function UserProfileModal({user:u,token,notify,onClose,onUpdated}){
+  const [listings,setListings]=useState([]);const [loadingL,setLoadingL]=useState(true);
+  const [lq,setLq]=useState("");const [lsf,setLsf]=useState("");
+  const [viewListing,setViewListing]=useState(null);
+  const [markSoldL,setMarkSoldL]=useState(null);const [soldCh,setSoldCh]=useState("platform");const [markingSold,setMarkingSold]=useState(false);
+
+  useEffect(()=>{
+    setLoadingL(true);
+    req(`/api/admin/users/${u.id}/listings`,{},token)
+      .then(d=>setListings(d.listings||[]))
+      .catch(()=>{})
+      .finally(()=>setLoadingL(false));
+  },[u.id,token]);
+
+  const filteredL=listings.filter(l=>
+    (!lsf||l.status===lsf)&&
+    (!lq||l.title?.toLowerCase().includes(lq.toLowerCase()))
+  );
+
+  const suspend=async()=>{
+    try{
+      await req(`/api/admin/users/${u.id}/suspend`,{method:"POST",body:JSON.stringify({suspend:!u.is_suspended})},token);
+      notify(u.is_suspended?"User unsuspended.":"User suspended.",true);
+      onUpdated({...u,is_suspended:!u.is_suspended});
+    }catch(e){notify(e.message,false);}
+  };
+
+  const updListingStatus=async(id,status)=>{
+    try{
+      await req(`/api/admin/listings/${id}`,{method:"PATCH",body:JSON.stringify({status})},token);
+      setListings(p=>p.map(l=>l.id===id?{...l,status}:l));
+      notify(`Status set to "${status}".`,true);
+    }catch(e){notify(e.message,false);}
+  };
+
+  const delListing=async id=>{
+    if(!window.confirm("Permanently delete this listing?"))return;
+    try{
+      await req(`/api/admin/listings/${id}`,{method:"DELETE"},token);
+      setListings(p=>p.filter(l=>l.id!==id));
+      notify("Deleted.",true);
+    }catch(e){notify(e.message,false);}
+  };
+
+  const confirmMarkSold=async()=>{
+    if(!markSoldL)return;
+    setMarkingSold(true);
+    try{
+      await req(`/api/admin/listings/${markSoldL.id}/mark-sold`,{method:"POST",body:JSON.stringify({sold_channel:soldCh})},token);
+      setListings(p=>p.map(l=>l.id===markSoldL.id?{...l,status:"sold"}:l));
+      notify(`"${markSoldL.title}" marked as sold.`,true);
+      setMarkSoldL(null);
+    }catch(e){notify(e.message,false);}
+    setMarkingSold(false);
+  };
+
+  const freeUnlock=async id=>{
+    try{
+      await req(`/api/admin/listings/${id}/free-unlock`,{method:"POST"},token);
+      setListings(p=>p.map(l=>l.id===id?{...l,is_unlocked:true}:l));
+      notify("Listing unlocked for free.",true);
+    }catch(e){notify(e.message,false);}
+  };
+
+  const sc=s=>({active:"bg",sold:"by2",locked:"bb2",deleted:"br2",archived:"by2",flagged:"br2",pending_review:"bb2",rejected:"br2"}[s]||"bm");
+
+  const totalAds=listings.length;
+  const activeAds=listings.filter(l=>l.status==="active").length;
+  const lockedAds=listings.filter(l=>l.status==="locked").length;
+  const soldAds=listings.filter(l=>l.status==="sold").length;
+  const pendingAds=listings.filter(l=>l.status==="pending_review").length;
+  const rejectedAds=listings.filter(l=>l.status==="rejected").length;
+
+  return <div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div className="modal lg" style={{maxWidth:900,maxHeight:"90vh",display:"flex",flexDirection:"column"}}>
+      <div className="mh">
+        <span style={{fontWeight:700,fontSize:16}}>User: {u.name}</span>
+        <button className="btn bgh sm" onClick={onClose}>✕</button>
+      </div>
+      <div className="mb" style={{overflowY:"auto",flex:1}}>
+
+        {/* User info card */}
+        <div style={{background:"var(--sh)",border:"1px solid var(--border)",padding:"16px 18px",marginBottom:20,display:"flex",gap:20,flexWrap:"wrap",alignItems:"flex-start"}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{u.name}</div>
+            <div style={{fontSize:12,color:"var(--mut)",marginBottom:2}}>{u.email}</div>
+            {u.phone&&<div style={{fontSize:12,color:"var(--mut)",marginBottom:2}}>{u.phone}</div>}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+              <span className={`badge ${u.role==="seller"?"bg":"bm"}`}>{u.role}</span>
+              {u.is_verified&&<span className="badge bg">Verified</span>}
+              <span className={`badge ${u.is_suspended?"br2":"bg"}`}>{u.is_suspended?"Suspended":"Active"}</span>
+              {u.violation_count>0&&<span className="badge br2">{u.violation_count} violations</span>}
+            </div>
+            <div style={{fontSize:11,color:"var(--mut)",marginTop:6}}>Joined {ago(u.created_at)}</div>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignSelf:"flex-start"}}>
+            <button className={`btn sm ${u.is_suspended?"bp":"by"}`} onClick={suspend}>
+              {u.is_suspended?"Unsuspend":"Suspend"}
+            </button>
+          </div>
+        </div>
+
+        {/* Listing stats strip */}
+        {!loadingL&&<div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+          {[
+            {l:"Total Ads",v:totalAds,cls:""},
+            {l:"Active",v:activeAds,cls:"bg"},
+            {l:"Locked",v:lockedAds,cls:"bb2"},
+            {l:"Sold",v:soldAds,cls:"by2"},
+            {l:"Pending Review",v:pendingAds,cls:"bb2"},
+            {l:"Rejected",v:rejectedAds,cls:"br2"},
+          ].map(s=>(
+            <div key={s.l} style={{background:"var(--sh)",border:"1px solid var(--border)",borderRadius:2,padding:"10px 16px",textAlign:"center",minWidth:80}}>
+              <div style={{fontSize:22,fontWeight:800,color:"var(--accent)",lineHeight:1}}>{s.v}</div>
+              <div style={{fontSize:10,color:"var(--mut)",marginTop:3,fontWeight:600,letterSpacing:".04em",textTransform:"uppercase"}}>{s.l}</div>
+            </div>
+          ))}
+        </div>}
+
+        {/* Listings management */}
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>All Listings by {u.name}</div>
+        <div className="sb" style={{marginBottom:12}}>
+          <input className="inp" style={{flex:1,maxWidth:220}} placeholder="Search listings..." value={lq} onChange={e=>setLq(e.target.value)}/>
+          <select className="inp" style={{width:150}} value={lsf} onChange={e=>setLsf(e.target.value)}>
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="locked">Locked</option>
+            <option value="sold">Sold</option>
+            <option value="pending_review">Pending Review</option>
+            <option value="rejected">Rejected</option>
+            <option value="archived">Archived</option>
+            <option value="deleted">Deleted</option>
+          </select>
+        </div>
+
+        {loadingL?<div style={{textAlign:"center",padding:32}}><Spin/></div>
+        :filteredL.length===0?<div className="empty">No listings found</div>
+        :<div className="tw"><div className="ts"><table>
+          <thead><tr><th>Title</th><th>Price</th><th>Category</th><th>Status</th><th>Views</th><th>Posted</th><th>Actions</th></tr></thead>
+          <tbody>{filteredL.map(l=>(
+            <tr key={l.id}>
+              <td style={{fontWeight:600,maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"#1428A0",cursor:"pointer"}} onClick={()=>setViewListing(l)} title={l.title}>{l.title}</td>
+              <td style={{color:"#1428A0",fontWeight:700}}>{fmtKES(l.price)}</td>
+              <td style={{fontSize:12,color:"var(--mut)"}}>{l.category}</td>
+              <td><span className={`badge ${sc(l.status)}`}>{l.status==="pending_review"?"Review":l.status}</span></td>
+              <td style={{fontSize:12,color:"var(--mut)"}}>{l.view_count||0}</td>
+              <td style={{fontSize:11,color:"var(--mut)"}}>{ago(l.created_at)}</td>
+              <td><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                <button className="btn bs sm" onClick={()=>setViewListing(l)}>View</button>
+                {l.status!=="active"&&l.status!=="deleted"&&<button className="btn bp sm" onClick={()=>updListingStatus(l.id,"active")}>Activate</button>}
+                {(l.status==="active"||l.status==="locked")&&<button className="btn by sm" onClick={()=>{setSoldCh("platform");setMarkSoldL(l);}}>Mark Sold</button>}
+                {!l.is_unlocked&&(l.status==="active"||l.status==="locked")&&<button className="btn bb sm" onClick={()=>freeUnlock(l.id)}>Free Unlock</button>}
+                <button className="btn br sm" onClick={()=>delListing(l.id)}>Delete</button>
+              </div></td>
+            </tr>
+          ))}</tbody>
+        </table></div></div>}
+      </div>
+    </div>
+
+    {viewListing&&<ListingDetailModal listing={viewListing} token={token} notify={notify} onClose={()=>setViewListing(null)} onUpdated={updated=>{setListings(p=>p.map(l=>l.id===updated.id?updated:l));setViewListing(updated);}}/>}
+
+    {markSoldL&&<Modal title="Mark Listing as Sold" onClose={()=>setMarkSoldL(null)}>
+      <div style={{fontWeight:700,marginBottom:4}}>{markSoldL.title}</div>
+      <div style={{fontSize:12,color:"var(--mut)",marginBottom:16}}>{fmtKES(markSoldL.price)}</div>
+      <label className="lbl">Where was it sold?</label>
+      <div style={{display:"flex",flexDirection:"column",gap:8,margin:"8px 0 16px"}}>
+        {[{val:"platform",label:"Via Weka Soko"},{val:"outside",label:"Outside the platform"}].map(o=>(
+          <div key={o.val} onClick={()=>setSoldCh(o.val)} style={{padding:"10px 14px",border:`2px solid ${soldCh===o.val?"#1428A0":"#E6E6E6"}`,cursor:"pointer",background:soldCh===o.val?"rgba(20,40,160,.04)":"#fff"}}>
+            <span style={{fontWeight:700,color:soldCh===o.val?"#1428A0":"var(--txt)"}}>{o.label}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <button className="btn bs" onClick={()=>setMarkSoldL(null)}>Cancel</button>
+        <button className="btn bp" onClick={confirmMarkSold} disabled={markingSold}>{markingSold?<Spin/>:"Confirm"}</button>
+      </div>
+    </Modal>}
+  </div>;
+}
+
 function Users({token,notify}){
   const [users,setUsers]=useState([]);const [loading,setLoading]=useState(true);const [q,setQ]=useState("");
+  const [viewUser,setViewUser]=useState(null);
   useEffect(()=>{
     const fetchUsers=()=>req("/api/admin/users",{},token).then(data=>{
       setUsers(Array.isArray(data)?data:(data.users||[]));
@@ -500,31 +682,45 @@ function Users({token,notify}){
     const iv=setInterval(fetchUsers,60000);
     return()=>clearInterval(iv);
   },[token]);
-  const suspend=async u=>{try{await req(`/api/admin/users/${u.id}/suspend`,{method:"POST",body:JSON.stringify({suspend:!u.is_suspended})},token);setUsers(p=>p.map(x=>x.id===u.id?{...x,is_suspended:!u.is_suspended}:x));notify(u.is_suspended?"User unsuspended.":"User suspended.",true);}catch(e){notify(e.message,false);}};
+  const suspend=async u=>{
+    try{
+      await req(`/api/admin/users/${u.id}/suspend`,{method:"POST",body:JSON.stringify({suspend:!u.is_suspended})},token);
+      setUsers(p=>p.map(x=>x.id===u.id?{...x,is_suspended:!u.is_suspended}:x));
+      notify(u.is_suspended?"User unsuspended.":"User suspended.",true);
+    }catch(e){notify(e.message,false);}
+  };
   const deleteUser=async(id,name)=>{
     if(!window.confirm(`Permanently delete "${name}"? All their listings and data will be gone.`))return;
     try{await req(`/api/admin/users/${id}`,{method:"DELETE"},token);setUsers(p=>p.filter(u=>u.id!==id));notify("User deleted.",true);}catch(e){notify(e.message,false);}
   };
   const filtered=users.filter(u=>u.role!=='admin'&&(!q||u.name?.toLowerCase().includes(q.toLowerCase())||u.email?.toLowerCase().includes(q.toLowerCase())));
   return <>
-    <div className="sb"><input className="inp" style={{flex:1,maxWidth:320}} placeholder="Search by name or email..." value={q} onChange={e=>setQ(e.target.value)}/><span style={{fontSize:12,color:"var(--mut)",alignSelf:"center"}}>{filtered.length} users</span></div>
+    <div className="sb">
+      <input className="inp" style={{flex:1,maxWidth:320}} placeholder="Search by name or email..." value={q} onChange={e=>setQ(e.target.value)}/>
+      <span style={{fontSize:12,color:"var(--mut)",alignSelf:"center"}}>{filtered.length} users</span>
+    </div>
     <div className="tw">{loading?<div style={{textAlign:"center",padding:40}}><Spin/></div>:
       <div className="ts"><table>
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Violations</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>{filtered.length===0?<tr><td colSpan={7}><div className="empty">No users</div></td></tr>:filtered.map(u=><tr key={u.id}>
-          <td style={{fontWeight:600}}>{u.name}</td>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Ads</th><th>Active</th><th>Sold</th><th>Joined</th><th>Violations</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>{filtered.length===0?<tr><td colSpan={10}><div className="empty">No users</div></td></tr>:filtered.map(u=><tr key={u.id}>
+          <td style={{fontWeight:600,cursor:"pointer",color:"#1428A0"}} onClick={()=>setViewUser(u)}>{u.name}</td>
           <td style={{color:"var(--mut)",fontSize:12}}>{u.email}</td>
-          <td><span className={`badge ${u.role==="admin"?"bb2":u.role==="seller"?"bg":"bm"}`}>{u.role}</span></td>
+          <td><span className={`badge ${u.role==="seller"?"bg":"bm"}`}>{u.role}</span></td>
+          <td style={{fontWeight:700,textAlign:"center"}}>{u.listing_count||0}</td>
+          <td style={{color:"#16a34a",fontWeight:600,textAlign:"center"}}>{u.active_listings||0}</td>
+          <td style={{color:"var(--gold)",fontWeight:600,textAlign:"center"}}>{u.sold_listings||0}</td>
           <td style={{color:"var(--mut)",fontSize:12}}>{ago(u.created_at)}</td>
-          <td style={{color:u.violation_count>0?"var(--red)":"var(--mut)"}}>{u.violation_count||0}</td>
+          <td style={{color:u.violation_count>0?"var(--red)":"var(--mut)",textAlign:"center"}}>{u.violation_count||0}</td>
           <td><span className={`badge ${u.is_suspended?"br2":"bg"}`}>{u.is_suspended?"Suspended":"Active"}</span></td>
           <td><div style={{display:"flex",gap:5}}>
-            <button className={`btn sm ${u.is_suspended?"bp":"br"}`} onClick={()=>suspend(u)}>{u.is_suspended?"Unsuspend":"Suspend"}</button>
+            <button className="btn bs sm" onClick={()=>setViewUser(u)}>Manage</button>
+            <button className={`btn sm ${u.is_suspended?"bp":"by"}`} onClick={()=>suspend(u)}>{u.is_suspended?"Unsuspend":"Suspend"}</button>
             <button className="btn br sm" onClick={()=>deleteUser(u.id,u.name)}>Delete</button>
           </div></td>
         </tr>)}</tbody>
       </table></div>}
     </div>
+    {viewUser&&<UserProfileModal user={viewUser} token={token} notify={notify} onClose={()=>setViewUser(null)} onUpdated={updated=>{setUsers(p=>p.map(u=>u.id===updated.id?{...u,...updated}:u));setViewUser(updated);}}/>}
   </>;
 }
 
