@@ -217,15 +217,15 @@ function FF({label,children}){return <div style={{marginBottom:13}}>{label&&<lab
 function WsLogo({size=32,showText=true,light=false}){
   const blue=light?"#fff":"#1428A0";
   const gold="#C49A00";
-  const w=size*1.5,h=size;
+  const w=size*(140/90),h=size;
   return <div style={{display:"flex",alignItems:"center",gap:showText?10:0,flexShrink:0}}>
-    <svg width={w} height={h} viewBox="0 0 90 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* W */}
-      <path d="M4 14L16 48L28 20L40 48L52 14" stroke={blue} strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* S */}
-      <path d="M82 18C73 11 57 13 57 26C57 38 76 36 76 49C76 59 60 61 50 55" stroke={blue} strokeWidth="9" strokeLinecap="round"/>
-      {/* Gold bar */}
-      <line x1="64" y1="6" x2="64" y2="55" stroke={gold} strokeWidth="8" strokeLinecap="round"/>
+    <svg width={w} height={h} viewBox="0 0 140 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* W — right peak meets the gold bar */}
+      <path d="M8 22 L26 68 L44 22 L62 68 L80 22" stroke={blue} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* S — interlocked, wrapping the W's right peak */}
+      <path d="M130 24 C105 16 82 26 82 40 C82 55 120 53 120 68 C120 80 102 85 80 84" stroke={blue} strokeWidth="11" strokeLinecap="round" fill="none"/>
+      {/* Gold bar — at the W/S intersection */}
+      <line x1="78" y1="10" x2="78" y2="84" stroke={gold} strokeWidth="11" strokeLinecap="round"/>
     </svg>
     {showText&&<div style={{lineHeight:1.1}}>
       <div style={{fontSize:size*0.56,fontWeight:800,letterSpacing:"-.03em",color:light?"#fff":"#111",fontFamily:"var(--fn)"}}>
