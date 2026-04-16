@@ -1245,6 +1245,30 @@ function BuyerRequests({token,notify}){
     finally{setStatusSaving(false);}
   };
 
+  const approveRequest=async(id)=>{
+    setStatusSaving(true);
+    try{
+      await req(`/api/admin/requests/${id}/approve`,{method:"POST"},token);
+      setItems(p=>p.map(r=>r.id===id?{...r,status:"active"}:r));
+      if(selected?.id===id)setSelected(p=>({...p,status:"active"}));
+      notify("Request approved and now live.",true);
+    }catch(e){notify(e.message,false);}
+    finally{setStatusSaving(false);}
+  };
+
+  const rejectRequest=async(id)=>{
+    const reason=window.prompt("Rejection reason (optional):");
+    if(reason===null)return;
+    setStatusSaving(true);
+    try{
+      await req(`/api/admin/requests/${id}/reject`,{method:"POST",body:JSON.stringify({reason})},token);
+      setItems(p=>p.map(r=>r.id===id?{...r,status:"rejected"}:r));
+      if(selected?.id===id)setSelected(p=>({...p,status:"rejected"}));
+      notify("Request rejected.",true);
+    }catch(e){notify(e.message,false);}
+    finally{setStatusSaving(false);}
+  };
+
   const deleteRequest=async(id)=>{
     if(!window.confirm("Permanently delete this buyer request and all its pitches?"))return;
     setDeleting(true);
@@ -1259,18 +1283,20 @@ function BuyerRequests({token,notify}){
   };
 
   const fmtDate=ts=>ts?new Date(ts).toLocaleDateString("en-KE",{day:"numeric",month:"short",year:"numeric"}):"-";
-  const sc=s=>({active:"bg2",closed:"bm",archived:"by2",expired:"br2"}[s]||"bm");
+  const sc=s=>({active:"bg2",closed:"bm",archived:"by2",expired:"br2",pending_review:"bb2",rejected:"br2"}[s]||"bm");
   const filtered=items.filter(r=>!q||r.title?.toLowerCase().includes(q.toLowerCase())||r.description?.toLowerCase().includes(q.toLowerCase())||r.requester_anon?.toLowerCase().includes(q.toLowerCase()));
 
   return <>
     <div className="sb" style={{marginBottom:16}}>
       <input className="inp" style={{flex:1,maxWidth:280}} placeholder="Search requests..." value={q} onChange={e=>setQ(e.target.value)}/>
-      <select className="inp" style={{width:140}} value={filter} onChange={e=>setFilter(e.target.value)}>
+      <select className="inp" style={{width:160}} value={filter} onChange={e=>setFilter(e.target.value)}>
         <option value="all">All Statuses</option>
+        <option value="pending_review">Pending Review</option>
         <option value="active">Active</option>
         <option value="closed">Closed</option>
         <option value="archived">Archived</option>
         <option value="expired">Expired</option>
+        <option value="rejected">Rejected</option>
       </select>
       <span style={{fontSize:12,color:"#636363",alignSelf:"center"}}>{total} request{total!==1?"s":""}</span>
     </div>
@@ -1298,9 +1324,11 @@ function BuyerRequests({token,notify}){
           <td style={{fontSize:12,color:"#636363",whiteSpace:"nowrap"}}>{fmtDate(r.created_at)}</td>
           <td><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
             <button className="btn bs sm" onClick={()=>openDetail(r)}>View</button>
+            {r.status==="pending_review"&&<button className="btn bg sm" onClick={()=>approveRequest(r.id)} disabled={statusSaving}>Approve</button>}
+            {r.status==="pending_review"&&<button className="btn br sm" onClick={()=>rejectRequest(r.id)} disabled={statusSaving}>Reject</button>}
             {r.status==="active"&&<button className="btn bm sm" onClick={()=>changeStatus(r.id,"closed")} disabled={statusSaving}>Close</button>}
             {r.status==="closed"&&<button className="btn bg2 sm" onClick={()=>changeStatus(r.id,"active")} disabled={statusSaving}>Reopen</button>}
-            {r.status!=="archived"&&<button className="btn by sm" onClick={()=>changeStatus(r.id,"archived")} disabled={statusSaving}>Archive</button>}
+            {r.status!=="archived"&&r.status!=="pending_review"&&<button className="btn by sm" onClick={()=>changeStatus(r.id,"archived")} disabled={statusSaving}>Archive</button>}
             <button className="btn br sm" onClick={()=>deleteRequest(r.id)} disabled={deleting}>Delete</button>
           </div></td>
         </tr>)}</tbody>
