@@ -1,6 +1,6 @@
 import React,{useState,useEffect,useCallback,useRef} from "react";
 
-const API = (process.env.REACT_APP_API_URL || "https://wekasokobackend.up.railway.app").replace(/\/$/, "");
+const API = (process.env.REACT_APP_API_URL || "https://weka-soko-backend.onrender.com").replace(/\/$/, "");
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
