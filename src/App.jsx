@@ -1147,8 +1147,16 @@ function SoldListings({token}){
   useEffect(()=>{
     setLoading(true);
     req(`/api/listings/admin/sold?page=${pg}&limit=${PER}`,{},token)
-      .then(d=>{setItems(d.listings||[]);setTotal(d.total||0);})
-      .catch(()=>{}).finally(()=>setLoading(false));
+    .then(d=>{
+      console.log("Sold listings response:", d);
+      setItems(d.listings||[]);
+      setTotal(d.total||0);
+    })
+    .catch(e=>{
+      console.error("Sold listings error:", e);
+      setItems([]);
+      setTotal(0);
+    }).finally(()=>setLoading(false));
   },[pg,token]);
 
   const fmtDate=ts=>ts?new Date(ts).toLocaleDateString("en-KE",{day:"numeric",month:"short",year:"numeric"}):"—";
