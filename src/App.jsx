@@ -1584,8 +1584,8 @@ function AuditLog({token}){
     setLoading(true);
     try{
       const d=await req(`/api/admin/audit-log?limit=${PER}&offset=${(p-1)*PER}`,{},token);
-      setRows(d.logs||[]);
-      setHasMore((d.logs||[]).length===PER);
+      setRows(d.log||[]);
+      setHasMore((d.log||[]).length===PER);
     }catch(e){console.error(e);}
     setLoading(false);
   };
@@ -1615,6 +1615,54 @@ function AuditLog({token}){
         <button className="btn bs sm" disabled={!hasMore} onClick={()=>setPage(p=>p+1)}>Next</button>
       </div>
     </>}
+  </>;
+}
+
+// ── Settings (Change Password) ─────────────────────────────────────────────────
+function Settings({token,notify}){
+  const [currentPw,setCurrentPw]=useState("");
+  const [newPw,setNewPw]=useState("");
+  const [confirmPw,setConfirmPw]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  const submit=async()=>{
+    if(!newPw||newPw.length<8){notify("Password must be at least 8 characters","error");return;}
+    if(newPw!==confirmPw){notify("Passwords do not match","error");return;}
+    setLoading(true);
+    try{
+      await req("/api/auth/change-password",{
+        method:"POST",
+        body:JSON.stringify({currentPassword:currentPw,newPassword:newPw})
+      },token);
+      notify("Password changed successfully","success");
+      setCurrentPw("");setNewPw("");setConfirmPw("");
+    }catch(e){notify(e.message||"Failed to change password","error");}
+    setLoading(false);
+  };
+
+  return<>
+    <div className="page-header"><h1 className="page-title">Settings</h1></div>
+    <div className="card" style={{maxWidth:480}}>
+      <h3 style={{fontSize:16,fontWeight:700,marginBottom:16}}>Change Password</h3>
+      <div style={{marginBottom:14}}>
+        <label className="lbl">Current Password</label>
+        <input className="inp" type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} placeholder="Enter current password"/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <label className="lbl">New Password</label>
+        <input className="inp" type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="Min 8 characters"/>
+      </div>
+      <div style={{marginBottom:20}}>
+        <label className="lbl">Confirm New Password</label>
+        <input className="inp" type="password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} placeholder="Re-enter new password"/>
+      </div>
+      <button className="btn bp" onClick={submit} disabled={loading||!currentPw||!newPw||!confirmPw}>
+        {loading?<span className="spin"/>:"Change Password"}
+      </button>
+      <p style={{fontSize:12,color:"var(--mut)",marginTop:14,lineHeight:1.6}}>
+        After changing your password, you will remain logged in. Use your new password for future logins.
+      </p>
+    </div>
   </>;
 }
 
@@ -1812,6 +1860,7 @@ function NavIcon({id}){
   if(id==="broadcast")return<svg {...s}><path d="M12 4a5 5 0 010 8"/><path d="M9.5 6a2 2 0 010 4"/><line x1="7" y1="8" x2="2" y2="8"/><line x1="2" y1="6" x2="4" y2="6"/><line x1="2" y1="10" x2="4" y2="10"/></svg>;
   if(id==="maintenance")return<svg {...s}><path d="M12 3.5A3.5 3.5 0 018.5 7c-.5 0-1-.1-1.4-.3L3 11.5a1.5 1.5 0 002 2L9.3 9a3.5 3.5 0 003.3-5.8l-1.5 1.5-.7-.7L12 3.5z"/></svg>;
   if(id==="audit")return<svg {...s}><rect x="2" y="1" width="12" height="14" rx="2"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8.5" y2="11"/></svg>;
+  if(id==="settings")return<svg {...s}><circle cx="8" cy="8" r="2.5"/><path d="M14.5 8h-1.8a.7.7 0 01-.6-.4c-.2-.5-.5-1-.8-1.4a.7.7 0 010-.9l1.3-1.3a1.5 1.5 0 00-2.1-2.1L9.1 2.6a.7.7 0 01-.9 0c-.4-.3-.9-.6-1.4-.8a.7.7 0 01-.4-.6V1.5h-2v1.8c0 .3-.2.5-.4.6-.5.2-1 .5-1.4.8a.7.7 0 01-.9 0L.6 4.2a1.5 1.5 0 00-2.1 2.1L-.2 7.6a.7.7 0 010 .9c-.3.4-.6.9-.8 1.4a.7.7 0 01-.6.4H-3v2h1.8c.3 0 .5.2.6.4.2.5.5 1 .8 1.4a.7.7 0 010 .9l-1.3 1.3a1.5 1.5 0 002.1 2.1l1.3-1.3a.7.7 0 01.9 0c.4.3.9.6 1.4.8.3.1.4.3.4.6v1.8h2v-1.8c0-.3.2-.5.4-.6.5-.2 1-.5 1.4-.8a.7.7 0 01.9 0l1.3 1.3a1.5 1.5 0 002.1-2.1l-1.3-1.3a.7.7 0 010-.9c.3-.4.6-.9.8-1.4a.7.7 0 01.6-.4h1.8v-2h-1.8z"/></svg>;
   return<svg {...s}><circle cx="8" cy="8" r="6"/></svg>;
 }
 
@@ -1832,6 +1881,7 @@ const SECTIONS=[
   {id:"broadcast",label:"Broadcast"},
   {id:"maintenance",label:"Maintenance"},
   {id:"audit",label:"Audit Log"},
+  {id:"settings",label:"Settings"},
 ];
 
 export default function AdminApp(){
@@ -1980,6 +2030,7 @@ export default function AdminApp(){
       {section==="broadcast"&&<Broadcast token={token} notify={notify}/>}
       {section==="maintenance"&&<MaintenanceControl token={token} notify={notify}/>}
       {section==="audit"&&<AuditLog token={token}/>}
+      {section==="settings"&&<Settings token={token} notify={notify}/>}
     </div>
     {toast&&<Toast key={toast.id} msg={toast.msg} ok={toast.ok} onClose={()=>setToast(null)}/>}
   </>;
