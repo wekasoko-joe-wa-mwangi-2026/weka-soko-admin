@@ -299,6 +299,11 @@ function Modal({title,onClose,children,footer,large}){
 
 function Login({onLogin}){
   const [email,setEmail]=useState("");const [pw,setPw]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
+  const [showForgot,setShowForgot]=useState(false);
+  const [forgotEmail,setForgotEmail]=useState("");
+  const [forgotLoading,setForgotLoading]=useState(false);
+  const [forgotSent,setForgotSent]=useState(false);
+  
   const submit=async()=>{
     if(!email||!pw){setErr("Enter email and password.");return;}
     setLoading(true);setErr("");
@@ -307,6 +312,42 @@ function Login({onLogin}){
       onLogin(d.user,d.token);
     }catch(e){setErr(e.message);}finally{setLoading(false);}
   };
+  
+  const sendReset=async()=>{
+    if(!forgotEmail){setErr("Enter your email address.");return;}
+    setForgotLoading(true);setErr("");
+    try{
+      await req("/api/auth/forgot-password",{method:"POST",body:JSON.stringify({email:forgotEmail.trim(),admin:true})});
+      setForgotSent(true);
+    }catch(e){setErr(e.message);}
+    setForgotLoading(false);
+  };
+  
+  if(showForgot){
+    return <div className="login-wrap">
+      <div className="login-box">
+        <div style={{textAlign:"center",marginBottom:28,paddingBottom:20,borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <WsLogo size={36}/>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:"var(--mut)"}}>Platform Administration</div>
+        </div>
+        <h2 style={{fontSize:18,fontWeight:700,marginBottom:12}}>Reset Password</h2>
+        <p style={{color:"var(--mut)",fontSize:13,marginBottom:20}}>Enter your email and we'll send you a reset link.</p>
+        {err&&<div className="alert-r">{err}</div>}
+        {forgotSent?(
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:14,color:"#15803d",marginBottom:8}}>✓ Reset link sent!</div>
+            <p style={{fontSize:13,color:"var(--mut)"}}>Check your email for instructions.</p>
+            <button className="btn bs" style={{marginTop:16}} onClick={()=>{setShowForgot(false);setForgotSent(false);setForgotEmail("");}}>Back to Login</button>
+          </div>
+        ):(<>
+          <FF label="Email"><input className="inp" type="email" placeholder="admin@wekasoko.co.ke" value={forgotEmail} onChange={e=>setForgotEmail(e.target.value)}/></FF>
+          <button className="btn bp" style={{width:"100%",marginTop:8}} onClick={sendReset} disabled={forgotLoading}>{forgotLoading?<Spin/>:"Send Reset Link →"}</button>
+          <button className="btn bgh" style={{width:"100%",marginTop:8}} onClick={()=>setShowForgot(false)}>Back to Login</button>
+        </>)}
+      </div>
+    </div>;
+  }
+  
   return <div className="login-wrap">
     <div className="login-box">
       <div style={{textAlign:"center",marginBottom:28,paddingBottom:20,borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
@@ -317,6 +358,9 @@ function Login({onLogin}){
       {err&&<div className="alert-r">{err}</div>}
       <FF label="Email"><input className="inp" type="email" placeholder="admin@wekasoko.co.ke" value={email} onChange={e=>setEmail(e.target.value)}/></FF>
       <FF label="Password"><input className="inp" type="password" placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/></FF>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:"-8px",marginBottom:8}}>
+        <button className="btn bgh" style={{fontSize:12,padding:0}} onClick={()=>setShowForgot(true)}>Forgot Password?</button>
+      </div>
       <button className="btn bp" style={{width:"100%",marginTop:8}} onClick={submit} disabled={loading}>{loading?<Spin/>:"Sign In →"}</button>
     </div>
   </div>;
