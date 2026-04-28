@@ -304,6 +304,15 @@ function Login({onLogin}){
   const [forgotLoading,setForgotLoading]=useState(false);
   const [forgotSent,setForgotSent]=useState(false);
   
+  // Check for reset token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('reset_token');
+  const [showReset,setShowReset] = useState(!!resetToken);
+  const [newPw,setNewPw] = useState("");
+  const [confirmNewPw,setConfirmNewPw] = useState("");
+  const [resetLoading,setResetLoading] = useState(false);
+  const [resetSuccess,setResetSuccess] = useState(false);
+
   const submit=async()=>{
     if(!email||!pw){setErr("Enter email and password.");return;}
     setLoading(true);setErr("");
@@ -312,7 +321,7 @@ function Login({onLogin}){
       onLogin(d.user,d.token);
     }catch(e){setErr(e.message);}finally{setLoading(false);}
   };
-  
+
   const sendReset=async()=>{
     if(!forgotEmail){setErr("Enter your email address.");return;}
     setForgotLoading(true);setErr("");
@@ -323,6 +332,48 @@ function Login({onLogin}){
     setForgotLoading(false);
   };
   
+  const handlePasswordReset=async()=>{
+    if(!newPw||newPw.length<8){setErr("Password must be at least 8 characters.");return;}
+    if(newPw!==confirmNewPw){setErr("Passwords do not match.");return;}
+    setResetLoading(true);setErr("");
+    try{
+      await req("/api/auth/reset-password",{method:"POST",body:JSON.stringify({token:resetToken,password:newPw})});
+      setResetSuccess(true);
+      // Clear token from URL
+      window.history.replaceState({},document.title,window.location.pathname);
+    }catch(e){setErr(e.message);}
+    setResetLoading(false);
+  };
+
+  if(showReset&&resetToken){
+    return <div className="login-wrap">
+      <div className="login-box">
+        <div style={{textAlign:"center",marginBottom:28,paddingBottom:20,borderBottom:"1px solid var(--border)",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <WsLogo size={36}/>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:"var(--mut)"}}>Platform Administration</div>
+        </div>
+        {resetSuccess?(
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:14,color:"#15803d",marginBottom:8}}>✓ Password reset successful!</div>
+            <p style={{fontSize:13,color:"var(--mut)",marginBottom:16}}>Your password has been updated. You can now log in.</p>
+            <button className="btn bp" style={{width:"100%"}} onClick={()=>{setShowReset(false);setResetSuccess(false);setNewPw("");setConfirmNewPw("");}}>Go to Login →</button>
+          </div>
+        ):(<>
+          <h2 style={{fontSize:18,fontWeight:700,marginBottom:12}}>Reset Your Password</h2>
+          <p style={{color:"var(--mut)",fontSize:13,marginBottom:20}}>Enter your new password below.</p>
+          {err&&<div className="alert-r">{err}</div>}
+          <FF label="New Password">
+            <input className="inp" type="password" placeholder="••••••••" value={newPw} onChange={e=>setNewPw(e.target.value)}/>
+          </FF>
+          <FF label="Confirm Password">
+            <input className="inp" type="password" placeholder="••••••••" value={confirmNewPw} onChange={e=>setConfirmNewPw(e.target.value)}/>
+          </FF>
+          <button className="btn bp" style={{width:"100%",marginTop:8}} onClick={handlePasswordReset} disabled={resetLoading}>{resetLoading?<Spin/>:"Reset Password →"}</button>
+        </>)}
+      </div>
+    </div>;
+  }
+
   if(showForgot){
     return <div className="login-wrap">
       <div className="login-box">
@@ -336,8 +387,8 @@ function Login({onLogin}){
         {forgotSent?(
           <div style={{textAlign:"center",padding:"20px 0"}}>
             <div style={{fontSize:14,color:"#15803d",marginBottom:8}}>✓ Reset link sent!</div>
-            <p style={{fontSize:13,color:"var(--mut)"}}>Check your email for instructions.</p>
-            <button className="btn bs" style={{marginTop:16}} onClick={()=>{setShowForgot(false);setForgotSent(false);setForgotEmail("");}}>Back to Login</button>
+            <p style={{fontSize:13,color:"var(--mut)",marginBottom:16}}>Check your email for instructions.</p>
+            <button className="btn bp" style={{width:"100%"}} onClick={()=>{setShowForgot(false);setForgotSent(false);setForgotEmail("");}}>Go to Login →</button>
           </div>
         ):(<>
           <FF label="Email"><input className="inp" type="email" placeholder="admin@wekasoko.co.ke" value={forgotEmail} onChange={e=>setForgotEmail(e.target.value)}/></FF>
