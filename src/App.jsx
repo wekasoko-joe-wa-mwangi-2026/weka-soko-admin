@@ -1540,12 +1540,13 @@ function Payments({token}){
 }
 
 function Vouchers({token,notify}){
-  const [vouchers,setVouchers]=useState([]);const [loading,setLoading]=useState(true);const [show,setShow]=useState(false);
-  const [form,setForm]=useState({type:"unlock",discount_percent:100,description:"",max_uses:50,expires_at:""});
-  const sf=(k,v)=>setForm(p=>({...p,[k]:v}));
-  useEffect(()=>{req("/api/admin/vouchers",{},token).then(setVouchers).catch(()=>{}).finally(()=>setLoading(false));},[token]);
-  const create=async()=>{try{const v=await req("/api/admin/vouchers",{method:"POST",body:JSON.stringify({...form,discount_percent:parseInt(form.discount_percent),max_uses:parseInt(form.max_uses)})},token);setVouchers(p=>[v,...p]);setShow(false);notify(`Created: ${v.code}`,true);}catch(e){notify(e.message,false);}};
-  const toggle=async v=>{try{const u=await req(`/api/admin/vouchers/${v.id}/toggle`,{method:"PATCH"},token);setVouchers(p=>p.map(x=>x.id===v.id?u:x));notify(`Voucher ${u.active?"activated":"deactivated"}.`,true);}catch(e){notify(e.message,false);}};
+const [vouchers,setVouchers]=useState([]);const [loading,setLoading]=useState(true);const [show,setShow]=useState(false);
+const [form,setForm]=useState({type:"unlock",discount_percent:100,description:"",max_uses:50,expires_at:""});
+const sf=(k,v)=>setForm(p=>({...p,[k]:v}));
+useEffect(()=>{req("/api/admin/vouchers",{},token).then(setVouchers).catch(()=>{}).finally(()=>setLoading(false));},[token]);
+const create=async()=>{try{const v=await req("/api/admin/vouchers",{method:"POST",body:JSON.stringify({...form,discount_percent:parseInt(form.discount_percent),max_uses:parseInt(form.max_uses)})},token);setVouchers(p=>[v,...p]);setShow(false);notify(`Created: ${v.code}`,true);}catch(e){notify(e.message,false);}};
+const toggle=async v=>{try{const u=await req(`/api/admin/vouchers/${v.id}/toggle`,{method:"PATCH"},token);setVouchers(p=>p.map(x=>x.id===v.id?u:x));notify(`Voucher ${u.active?"activated":"deactivated"}.`,true);}catch(e){notify(e.message,false);}};
+const remove=async v=>{if(!window.confirm(`Delete voucher ${v.code}? This cannot be undone.`))return;try{await req(`/api/admin/vouchers/${v.id}`,{method:"DELETE"},token);setVouchers(p=>p.filter(x=>x.id!==v.id));notify(`Deleted: ${v.code}`,true);}catch(e){notify(e.message,false);}};
   return <>
     <div style={{marginBottom:20}}><button className="btn bp" onClick={()=>setShow(true)}>+ Generate Voucher</button></div>
     <div className="tw">{loading?<div style={{textAlign:"center",padding:40}}><Spin/></div>:
@@ -1557,9 +1558,9 @@ function Vouchers({token,notify}){
           <td style={{fontWeight:700,color:"var(--gold)"}}>{v.discount_percent}%</td>
           <td style={{color:"var(--mut)"}}>{v.uses}/{v.max_uses}</td>
           <td style={{fontSize:12,color:"var(--mut)"}}>{v.expires_at?new Date(v.expires_at).toLocaleDateString():"No expiry"}</td>
-          <td><span className={`badge ${v.active?"bg":"br2"}`}>{v.active?"Active":"Inactive"}</span></td>
-          <td><button className={`btn sm ${v.active?"br":"bp"}`} onClick={()=>toggle(v)}>{v.active?"Deactivate":"Activate"}</button></td>
-        </tr>)}</tbody>
+<td><span className={`badge ${v.active?"bg":"br2"}`}>{v.active?"Active":"Inactive"}</span></td>
+<td><div style={{display:"flex",gap:6}}><button className={`btn sm ${v.active?"br":"bp"}`} onClick={()=>toggle(v)}>{v.active?"Deactivate":"Activate"}</button><button className="btn sm br" onClick={()=>remove(v)} style={{backgroundColor:"var(--red)",color:"#fff"}}>Delete</button></div></td>
+</tr>)}</tbody>
       </table></div>}
     </div>
     {show&&<Modal title="Generate Voucher" onClose={()=>setShow(false)} footer={<><button className="btn bs" onClick={()=>setShow(false)}>Cancel</button><button className="btn bp" onClick={create}>Generate →</button></>}>
