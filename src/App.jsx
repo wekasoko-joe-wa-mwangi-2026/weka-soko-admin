@@ -1,6 +1,7 @@
 import React,{useState,useEffect,useCallback,useRef} from "react";
 
 const API = (process.env.REACT_APP_API_URL || "https://weka-soko-backend.onrender.com").replace(/\/$/, "");
+console.log("API Base URL:", API);
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -203,11 +204,21 @@ const fmtKES = n => "KSh " + Number(n || 0).toLocaleString("en-KE");
 const ago = ts => { if (!ts) return "—"; const d = Date.now() - new Date(ts).getTime(); if (d < 3600000) return Math.floor(d/60000)+"m ago"; if (d < 86400000) return Math.floor(d/3600000)+"h ago"; return Math.floor(d/86400000)+"d ago"; };
 
 async function req(path, opts={}, token) {
-  const headers = {"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{}),...opts.headers};
-  const res = await fetch(`${API}${path}`,{...opts,headers});
-  const data = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.error||"Request failed");
-  return data;
+const headers = {"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{}),...opts.headers};
+console.log(`Request: ${opts.method||'GET'} ${API}${path}`);
+let res;
+try {
+res = await fetch(`${API}${path}`,{...opts,headers});
+} catch (fetchErr) {
+console.error("Fetch failed:", fetchErr.message);
+throw new Error(`Network error: ${fetchErr.message}. Check if backend is running at ${API}`);
+}
+const data = await res.json().catch(()=>({}));
+if(!res.ok) {
+console.error("API Error:", data.error || "Request failed");
+throw new Error(data.error||"Request failed");
+}
+return data;
 }
 
 function Spin(){return <span className="spin"/>;}
