@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Backend Connection</title>
+</head>
+<body>
+    <h1>Backend Connection Test</h1>
+    <div id="result">Testing...</div>
+    <script>
+        const API = "https://weka-soko-backend.onrender.com";
+        fetch(`${API}/health`)
+            .then(res => {
+                if (res.ok) {
+                    document.getElementById('result').innerHTML = `
+                        <div style="color: green; font-size: 20px;">✓ Backend is responding!</div>
+                        <p>Status: ${res.status}</p>
+                        <p>API URL: ${API}</p>
+                        <p>Try login with:</p>
+                        <ul>
+                            <li>Email: admin@wekasoko.co.ke</li>
+                            <li>Password: WekaSoko@Admin2026</li>
+                        </ul>
+                    `;
+                } else {
+                    document.getElementById('result').innerHTML = `
+                        <div style="color: red;">✗ Backend returned status: ${res.status}</div>
+                    `;
+                }
+            })
+            .catch(err => {
+                document.getElementById('result').innerHTML = `
+                    <div style="color: red;">✗ Failed to connect: ${err.message}</div>
+                    <p>Check if you can access: <a href="${API}/health" target="_blank">${API}/health</a></p>
+                `;
+            });
+    </script>
+</body>
+</html>
