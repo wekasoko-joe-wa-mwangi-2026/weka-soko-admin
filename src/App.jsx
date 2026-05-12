@@ -1,6 +1,6 @@
-import React,{useState,useEffect,useCallback} from "react";
+﻿import React,{useState,useEffect,useCallback} from "react";
 
-const API = (process.env.REACT_APP_API_URL || "https://weka-soko-backend.onrender.com").replace(/\/$/, "");
+const API = (process.env.REACT_APP_API_URL || "https://weka-soko-backend-production.up.railway.app").replace(/\/$/, "");
 
 const CSS = `
 @font-face{font-family:'SamsungSharpSans';font-weight:400;font-style:normal;font-display:swap;
