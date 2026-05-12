@@ -1,4 +1,4 @@
-﻿import React,{useState,useEffect,useCallback} from "react";
+﻿SECTIONS=[ {id:"overview",icon:"📊",label:"Overview"}, {id:"review",icon:"🔍",label:"Review Queue"}, {id:"users",icon:"👥",label:"Users"}, {id:"listings",icon:"📦",label:"Listings"}, {id:"sold",icon:"✅",label:"Sold Listings"}, {id:"requests",icon:"📝",label:"Buyer Requests"}, {id:"reports",icon:"🚨",label:"Reports"}, {id:"violations",icon:"⚠️",label:"Violations"}, {id:"escrow",icon:"💰",label:"Escrow & Disputes"}, {id:"payments",icon:"💵",label:"Payments"}, {id:"vouchers",icon:"🎟️",label:"Vouchers"}, {id:"admins",icon:"👑",label:"Admin Team"}, {id:"pending-payments",icon:"⏳",label:"Pending Payments"}, {id:"broadcast",icon:"📢",label:"Broadcast"}, {id:"maintenance",icon:"🔧",label:"Maintenance"}, {id:"audit",icon:"📋",label:"Audit Log"}]import React,{useState,useEffect,useCallback} from "react";
 
 const API = (process.env.REACT_APP_API_URL || "https://weka-soko-backend.onrender.com").replace(/\/$/, "");
 
