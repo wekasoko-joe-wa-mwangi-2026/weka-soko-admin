@@ -91,8 +91,20 @@ tbody td{padding:11px 14px;font-size:13px;vertical-align:middle;}
 const fmtKES = n => "KSh " + Number(n || 0).toLocaleString("en-KE");
 const ago = ts => { if (!ts) return "—"; const d = Date.now() - new Date(ts).getTime(); if (d < 3600000) return Math.floor(d/60000)+"m ago"; if (d < 86400000) return Math.floor(d/3600000)+"h ago"; return Math.floor(d/86400000)+"d ago"; };
 
+// ── CSRF Token Helper ─────────────────────────────────────────────────────────
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;)\\s*XSRF-TOKEN=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 async function req(path, opts={}, token) {
-  const headers = {"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{}),...opts.headers};
+  const csrfToken = getCsrfToken();
+  const headers = {
+    "Content-Type":"application/json",
+    ...(token?{Authorization:`Bearer ${token}`}:{}),
+    ...(csrfToken?{ 'X-CSRF-Token': csrfToken } : {}),
+    ...opts.headers
+  };
   const res = await fetch(`${API}${path}`,{...opts,headers});
   const data = await res.json().catch(()=>({}));
   if(!res.ok) throw new Error(data.error||"Request failed");
